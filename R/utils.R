@@ -1,0 +1,223 @@
+# Function to get sample-level metadata,
+# from an ArchR project's colData
+sampleDataFromCellColData <- function(cellColData, sampleLabel) {
+  if (!(sampleLabel %in% colnames(cellColData))) {
+    stop(paste(
+      "`sampleLabel` must present in your ArchR Project's cellColData",
+      "Check `names(getCellColData(ArchRProj)` for possible sample columns."
+    ))
+  }
+
+  # Drop columns where all values are NA
+  cellColDataNoNA <- BiocGenerics::Filter(function(x) {
+    !all(is.na(x))
+  }, cellColData)
+
+  # Convert to data.table
+  cellColDT <- data.table::as.data.table(cellColDataNoNA)
+
+  BoolDT <- cellColDT[, lapply(.SD, function(x) {
+    length(unique(x)) == 1
+  }), by = c(sampleLabel)]
+  trueCols <- apply(BoolDT, 2, all)
+  trueCols[[sampleLabel]] <- TRUE
+  cellColDF <- as.data.frame(cellColDT)
+
+  sampleData <- dplyr::distinct(cellColDF[, names(which(trueCols)), drop = F])
+
+  # Set sampleIDs as rownames
+  rownames(sampleData) <- sampleData[[sampleLabel]]
+  return(sampleData)
+}
+
+
+# Function to split the output of getPopFrags into a list
+# of lists of GRanges, one named for each celltype.
+# Resulting in a list containing each celltype, and each
+# celltype has a list of GRanges name for each sample.
+splitFragsByCellPop <- function(frags) {
+
+  # Rename frags by cell population
+  renamedFrags <- lapply(
+    1:length(frags),
+    function(y) {
+      # Split out celltype and sample from the name
+      x <- frags[y]
+      celltype_sample <- names(x)
+      splits <- unlist(stringr::str_split(celltype_sample, "#"))
+      celltype <- splits[1]
+      sample <- unlist(stringr::str_split(splits[2], "__"))[1]
+      # Rename the fragments with just the sample
+      names(x) <- sample
+      # Return as a list named for celltype
+      output <- list(x)
+      names(output) <- celltype
+      output
+    }
+  )
+
+  # Group frags by cell population
+  renamedFrags <- unlist(renamedFrags, recursive = FALSE)
+  splitFrags <- split(renamedFrags, f = names(renamedFrags))
+  return(splitFrags)
+}
+
+
+# Tests if a string is a in the correct format to convert to GRanges
+validRegionString <- function(regionString) {
+  if (!is.character(regionString)) {
+    return(FALSE)
+  }
+
+  pattern <- "([0-9]{1,2}|chr[0-9]{1,2}|chr[X-Y]{1,1}):[0-9]*-[0-9]*"
+  matchedPattern <- stringr::str_extract(regionString, pattern)
+
+  if (any(is.na(matchedPattern))) {
+    return(FALSE)
+  } else if (any(!matchedPattern == regionString)) {
+    return(FALSE)
+  }
+
+  splits <- stringr::str_split(regionString, "[:-]")[[1]]
+  start <- splits[2]
+  end <- splits[3]
+  if (any(start > end)) {
+    return(FALSE)
+  }
+
+  # All conditions satisfied
+  return(TRUE)
+}
+
+#' @title \code{StringsToGRanges}
+#'
+#' @description \code{StringsToGRanges} Turns a list of strings in the format chr1:100-200
+#'   into a GRanges object
+#'
+#' @param regionString A string or list of strings each in the format chr1:100-200
+#' @return a GRanges object with ranges representing the input string(s)
+#'
+#' @export
+StringsToGRanges <- function(regionString) {
+  # if (length(regionString)>1){
+  #   boolList <- lapply(regionString, function(x){validRegionString(x)})
+  #   if (!all(boolList)){
+  #     stop("Some region strings are invalid. Given regions must all be strings matching format 'seqname:start-end', where start<end e.g. chr1:123000-123500")
+  #   }
+  # } else if(!validRegionString(regionString)) {
+  #   stop("Region must be a string matching format 'seqname:start-end', where start<end e.g. chr1:123000-123500")
+  # }
+  . <- NULL
+  chrom <- gsub(":.*", "", regionString)
+  startSite <- gsub(".*:", "", regionString) %>%
+    gsub("-.*", "", .) %>%
+    as.numeric()
+  endSite <- gsub(".*-", "", regionString) %>% as.numeric()
+
+  if (any(startSite >= endSite)) {
+    stop("Error in region string: Make sure the start of the genomic range occurs before the end")
+  }
+  regionGRanges <- GenomicRanges::GRanges(seqnames = chrom, ranges = IRanges::IRanges(start = startSite, end = endSite), strand = "*")
+  return(regionGRanges)
+}
+
+#' @title \code{GRangesToString} Converts a GRanges object to a string in the format 'chr1:100-200'
+#'
+#' @description \code{GRangesToString} Turns a GRanges Object into
+#'  a list of strings in the format chr1:100-200
+#'
+#' @param GR_obj the GRanges object to convert to a string
+#' @return A string or list of strings in the format 'chr1:100-200' representing
+#'  ranges in the input GRanges
+#'
+#' @export
+GRangesToString <- function(GR_obj) {
+  paste(GenomicRanges::seqnames(GR_obj), ":", GenomicRanges::start(GR_obj), "-", GenomicRanges::end(GR_obj), sep = "")
+}
+
+#' @title \code{differentialsToGRanges} Converts a data.frame matrix to a GRanges,
+#'   preserving additional columns as GRanges metadata
+#'
+#' @param differentials a matrix/data.frame with a column tileColumn containing
+#'   region strings in the format "chr:start-end"
+#' @param tileColumn name of column containing region strings. Default is "Tile".
+#'
+#' @return a GRanges containing all original information
+#' @export
+differentialsToGRanges <- function(differentials, tileColumn = "Tile") {
+  regions <- MOCHA::StringsToGRanges(differentials[[tileColumn]])
+  GenomicRanges::mcols(regions) <- differentials
+  regions
+}
+
+#################      Category          Not in Category       Total
+## Group1      length(Group1Cat)        length(OnlyGroup1)       m
+## Group2      length(Group2Cat)        length(OnlyGroup2)       n
+# Total                  k
+
+### Enrichment test for GRanges. Test for enrichment of Category within Group1
+### @Group1 - A GRanges object for one set of positions
+### @Group2 - The background GRanges object, non-overlapping with Group1.
+### @Category - A GRanges object of known locations, such as motifs, that you want to test for enrichment in Group1.
+### @type - Default is null. You can use this to pull out or simplify the test to a metadata column within the GRanges
+###          for Group1 and Group2. For example, if you want to test for enrichment of all genes, instead of open regions.
+###          If type = null, then it will just use the number of Ranges instead of the number of unique
+###           entries in column 'type'
+EnrichedRanges <- function(Group1, Group2, Category, type = NULL, returnTable = FALSE) {
+  Group1Cat <- plyranges::filter_by_overlaps(Group1, Category)
+  Group2Cat <- plyranges::filter_by_overlaps(Group2, Category)
+
+  OnlyGroup1 <- plyranges::filter_by_non_overlaps(Group1, Category)
+  OnlyGroup2 <- plyranges::filter_by_non_overlaps(Group2, Category)
+
+  if (returnTable & is.null(type)) {
+    dt_table <- data.frame(
+      Group1 = c(length(Group1Cat), length(OnlyGroup1)),
+      Group2 = c(length(Group2Cat), length(OnlyGroup2)),
+      row.names = c("In Category", "Not in Category")
+    )
+
+    return(t(dt_table))
+  } else if (returnTable &
+    sum(c(colnames(GenomicRanges::mcols(Group1)), colnames(GenomicRanges::mcols(Group2))) %in% type) == 2 &
+    length(type) == 1) {
+    dt_table <- data.frame(
+      Group1 = c(
+        length(unique(GenomicRanges::mcols(Group1Cat)[, type])),
+        length(unique(GenomicRanges::mcols(OnlyGroup1)[, type]))
+      ),
+      Group2 = c(
+        length(unique(GenomicRanges::mcols(Group2Cat)[, type])),
+        length(unique(GenomicRanges::mcols(OnlyGroup2)[, type]))
+      ),
+      row.names = c("In Category", "Not in Category")
+    )
+
+    return(t(dt_table))
+  } else if (returnTable) {
+    stop("Error: Incorrect method or column name. Please check input")
+  }
+
+  if (is.null(type)) {
+    pVal <- stats::phyper(
+      q = length(Group1Cat),
+      m = length(Group1),
+      n = length(Group2),
+      k = length(Group1Cat) + length(Group2Cat),
+      lower.tail = FALSE
+    )
+  } else if (sum(c(colnames(GenomicRanges::mcols(Group1)), colnames(GenomicRanges::mcols(Group2))) %in% type) == 2 &
+    length(type) == 1) {
+    pVal <- stats::phyper(
+      q = length(unique(GenomicRanges::mcols(Group1Cat)[, type])),
+      m = length(unique(GenomicRanges::mcols(Group1)[, type])),
+      n = length(unique(GenomicRanges::mcols(Group2)[, type])),
+      k = length(unique(GenomicRanges::mcols(Group1Cat)[, type])) + length(unique(GenomicRanges::mcols(Group2Cat)[, type])),
+      lower.tail = FALSE
+    )
+  } else {
+    stop("Error: Incorrect method or column name. Please check input")
+  }
+
+  return(pVal)
+}
