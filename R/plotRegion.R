@@ -10,11 +10,11 @@
 #'   'whichGene' the \pkg{RMariaDB} package must be installed.
 #'
 #' @param countSE A SummarizedExperiment from MOCHA::getCoverage
-#' @param plotType Options include 'overlaid','area', or 'RidgePlot'. default is
-#'   'area', which will plot a separate track for each group with the area
-#'   filled in under the curve. Setting plotType to 'overlaid' will overlay
+#' @param plotType Options include 'overlaid','area', 'line', or 'RidgePlot'.
+#'   default is 'area', which will plot a separate track for each group with the
+#'   area filled in under the curve. Setting plotType to 'overlaid' will overlay
 #'   count plot histograms across samples, instead of faceting out separately.
-#'   Setting plotType to 'RidgePlot' will generate a ridgeplot across all
+#'   Setting plotType to 'RidgePlot' will generate a RidgePlot across all
 #'   groups.
 #' @param base_size Numeric, default 12. Global plot base text size parameter
 #' @param counts_color Optional color palette. A named vector of color values
@@ -57,7 +57,7 @@
 #' @param showGene Logical value, default TRUE. Whether or not the gene track
 #'   should be plotted.
 #' @param whichGene Name of gene for plotting this specific gene in region.
-#' @param db_id_col Character value. Column in `orgdb` containing the output id
+#' @param db_id_col Character value. Column in `OrgDb` containing the output id
 #'   for `whichGene` plotting. Default "REFSEQ".
 #' @param collapseGenes Options include 'collapseAll', 'longestTx', or 'None'
 #'   Default 'None' will plot the expanded view of the reference genes,
@@ -67,8 +67,8 @@
 #'   gene plot. Default NULL will use `.gene_plot_theme`
 #' @param additionalGRangesTrack A GRanges object containing additional track
 #'   plot data
-#' @param linkdf A dataframe with co-accessible links to display as an additional
-#'   track
+#' @param linkdf A dataframe with co-accessible links to display as an
+#'   additional track
 #' @param showIdeogram Logical value, default TRUE. If TRUE plots the chromosome
 #'   ideogram at the top of the multi-track plot
 #' @param ideogram_genome Character value, a genome name for the ideogram plot.
@@ -177,9 +177,8 @@ plotRegion <- function(countSE,
   chrom <- toString(unique(countdf$chr))
   .relativeHeights_default <- c(`Chr` = 0.9, `Normalized Counts` = 7, `Genes` = 2, `AdditionalGRanges` = 4.5, `Links` = 1.5) # retain in case any missing
 
-  TxDb <- AnnotationDbi::loadDb(countSE@metadata$TxDb)
-  orgdb <- AnnotationDbi::loadDb(countSE@metadata$Org)
-
+  TxDb <- getAnnotationDbFromInstalledPkgname(countSE@metadata$TxDb$pkgname, "TxDb")
+  OrgDb <- getAnnotationDbFromInstalledPkgname(countSE@metadata$OrgDb$pkgname, "OrgDb")
   # Base Plot of Sample Counts
   p1 <- verbf(
     counts_plot_samples(countdf,
@@ -231,7 +230,7 @@ plotRegion <- function(countSE,
           whichGene = whichGene,
           countdf = countdf,
           regionGRanges = regionGRanges,
-          orgdb = orgdb,
+          orgdb = OrgDb,
           verbose = verbose
         )
       )
@@ -253,9 +252,9 @@ plotRegion <- function(countSE,
       # Create your reference for plotting gene body
 
       if (tolower(collapseGenes) == "longesttx") {
-        Homo.sapiens.hg38 <- simplifiedOrgDb(TxDb = TxDb, orgdb = orgdb)
+        Homo.sapiens.hg38 <- simplifiedOrgDb(TxDb = TxDb, orgdb = OrgDb)
       } else {
-        Homo.sapiens.hg38 <- verbf(OrganismDbi::makeOrganismDbFromTxDb(TxDb, orgdb = orgdb))
+        Homo.sapiens.hg38 <- verbf(OrganismDbi::makeOrganismDbFromTxDb(TxDb, orgdb = OrgDb))
       }
 
       geneBody <- verbf(get_grange_genebody(regionGRanges, TxDb = TxDb, single.strand.genes.only = TRUE))

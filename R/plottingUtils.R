@@ -102,7 +102,7 @@ get_grange_genebody <- function(regionGRanges, TxDb, single.strand.genes.only = 
 #' @param countdf  A dataframe that comes from `getbpCounts()` or `getbpInserts()`
 #' @param plotType Options include 'overlaid','area', 'line', or 'RidgePlot'. default is 'area', which will plot a separate track for each group.
 #' Setting plotType to 'overlaid' will overlay count plot histograms across samples, instead of faceting out separately.
-#' Setting plotType to 'RidgePlot' will generate a ridgeplot across all groups.
+#' Setting plotType to 'RidgePlot' will generate a RidgePlot across all groups.
 #' @param base_size Numeric, default 12. Global plot base text size parameter
 #' @param counts_color Optional color palette. A named vector of color values where names are unique values in the `color_var` column
 #' @param range_label_size Numeric value, default 4. Text size for the y-axis range label
@@ -585,6 +585,7 @@ counts_plot_motif_overlay <- function(p1,
 #' @return GRanges object for gene to plot
 #'
 #' @noRd
+
 get_gene_body_model <- function(whichGene,
                                 regionGRanges,
                                 countdf,
@@ -594,7 +595,10 @@ get_gene_body_model <- function(whichGene,
   seqnames <- . <- tx_name <- model <- NULL
   # Check for dependency RMariaDB needed for GenomicFeatures::makeTxDbFromUCSC
   if (!requireNamespace("RMariaDB", quietly = TRUE)) {
-    stop("Couldn't load the package RMariaDB. RMariaDB must be installed to plot specific genes.")
+    stop(
+      "Package 'RMariaDB' is required to plot specific genes with GenomicFeatures::makeTxDbFromUCSC. ",
+      "Please install 'RMariaDB' to proceed."
+    )
   }
 
   # Get REFSEQ values for gene symbol
@@ -665,22 +669,25 @@ get_gene_body_model <- function(whichGene,
       plyranges::mutate(nameList = paste(whichGene, tx_name, sep = ": ")) %>%
       GenomicRanges::makeGRangesListFromDataFrame(., split.field = "nameList", keep.extra.columns = TRUE)
 
-    # check for transcripts that are identical within the window
-    uniqueTranscripts <- IRanges::stack(newModel)[!duplicated(GenomicRanges::ranges(utils::stack(newModel)))] %>%
-      plyranges::filter(model != "utr") %>%
-      as.data.frame() %>%
-      dplyr::select(tx_name) %>%
-      unique(.)
-    newModel <- newModel[grepl(paste(unlist(uniqueTranscripts), collapse = "|"), names(newModel))]
-
-    names(newModel) <- rep(whichGene, length(newModel))
-
+    # check for transcripts that are identical within the window. If only one transcript, then just rename it to the gene name.
+    if (length(newModel) > 1) {
+      uniqueTranscripts <- IRanges::stack(newModel)[!duplicated(GenomicRanges::ranges(IRanges::stack(newModel)))] %>%
+        plyranges::filter(model != "utr") %>%
+        as.data.frame() %>%
+        dplyr::select(tx_name) %>%
+        unique(.)
+      newModel <- newModel[grepl(paste(unlist(uniqueTranscripts), collapse = "|"), names(newModel))]
+      names(newModel) <- rep(whichGene, length(newModel))
+    } else {
+      names(newModel) <- whichGene
+    }
     return(newModel)
   } else {
-    warning("whichGene did not contain genes names for any genes in the window. Plotting all transcripts.")
+    warning("whichGene did not contain sgenes names for any genes in the window. Plotting all transcripts.")
     return(NULL)
   }
 }
+
 
 #' Common theme for gene plots
 .gene_plot_theme <- list(

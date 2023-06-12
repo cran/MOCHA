@@ -30,11 +30,11 @@ make_prediction <- function(X, finalModelObject) {
   ### We do not make predictions
 
   if (cell_model < 5) {
-    stop("Cannot make peak calls with < 5 cells, returning NULL object")
+    return(NULL)
   } else {
 
     ### Apply model fit based on the
-    ### cell abundance. First Part is a loess
+    ### cell abundance. First Part is a LOESS
     ### Fit, final part is a linear fit,
     ### Middle part is an average between
     ### Loess & Linear fits.

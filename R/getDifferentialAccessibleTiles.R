@@ -30,22 +30,22 @@
 #' \dontrun{
 #' cellPopulation <- "MAIT"
 #' foreground <- "Positive"
-#' background <- "Negative" 
+#' background <- "Negative"
 #' # Standard output will display the number of tiles found below a false-discovery rate threshold.
-#' # This parameter does not filter results and only affects the aforementioned message. 
+#' # This parameter does not filter results and only affects the aforementioned message.
 #' fdrToDisplay <- 0.2
 #' # Choose to output a GRanges or data.frame.
 #' # Default is TRUE
 #' outputGRanges <- TRUE
 #' # SampleTileMatrices is the output of MOCHA::getSampleTileMatrix
 #' differentials <- MOCHA::getDifferentialAccessibleTiles(
-#'   SampleTileObj = SampleTileMatrices, 
-#'   cellPopulation = cellPopulation, 
-#'   groupColumn = groupColumn, 
-#'   foreground = foreground, 
-#'   background = background, 
-#'   fdrToDisplay = fdrToDisplay, 
-#'   outputGRanges = outputGRanges, 
+#'   SampleTileObj = SampleTileMatrices,
+#'   cellPopulation = cellPopulation,
+#'   groupColumn = groupColumn,
+#'   foreground = foreground,
+#'   background = background,
+#'   fdrToDisplay = fdrToDisplay,
+#'   outputGRanges = outputGRanges,
 #'   numCores = numCores
 #' )
 #' }
@@ -60,7 +60,7 @@ getDifferentialAccessibleTiles <- function(SampleTileObj,
                                            minZeroDiff = 0.5,
                                            fdrToDisplay = 0.2,
                                            outputGRanges = TRUE,
-                                           numCores = 2,
+                                           numCores = 1,
                                            verbose = FALSE) {
   if (!any(names(SummarizedExperiment::assays(SampleTileObj)) %in% cellPopulation)) {
     stop("cellPopulation was not found within SampleTileObj. Check available cell populations with `colData(SampleTileObj)`.")
@@ -95,7 +95,7 @@ getDifferentialAccessibleTiles <- function(SampleTileObj,
   # Enforce that the samples included are in foreground and background groups -
   # this can onl be an A vs B comparison, i.e. this ignores other groups in groupCol
 
-  sampleTileMatrix <- sampleTileMatrix[, colnames(sampleTileMatrix) %in% c(foreground_samples, background_samples)]
+  sampleTileMatrix <- sampleTileMatrix[, colnames(sampleTileMatrix) %in% c(foreground_samples, background_samples), drop = FALSE]
 
 
   group <- as.numeric(colnames(sampleTileMatrix) %in% foreground_samples)
@@ -103,30 +103,29 @@ getDifferentialAccessibleTiles <- function(SampleTileObj,
   #############################################################################
   # Prioritize high-signal tiles
 
-  medians_a <- matrixStats::rowMedians(sampleTileMatrix[, which(group == 1)], na.rm = T)
-  medians_b <- matrixStats::rowMedians(sampleTileMatrix[, which(group == 0)], na.rm = T)
+  # Log2 transform the matrix
+  # (input must not be log2 transformed prior to this)
+  sampleTileMatrix <- log2(sampleTileMatrix + 1)
 
-  # We need to enforce that NAs were set to zeros in getSampleTileMatrix
+  medians_a <- matrixStats::rowMedians(sampleTileMatrix[, which(group == 1), drop = FALSE], na.rm = T)
+  medians_b <- matrixStats::rowMedians(sampleTileMatrix[, which(group == 0), drop = FALSE], na.rm = T)
+
+  # Set NAs to zero
   sampleTileMatrix[is.na(sampleTileMatrix)] <- 0
 
-  zero_A <- rowMeans(sampleTileMatrix[, which(group == 1)] == 0)
-  zero_B <- rowMeans(sampleTileMatrix[, which(group == 0)] == 0)
+  zero_A <- rowMeans(sampleTileMatrix[, which(group == 1), drop = FALSE] == 0)
+  zero_B <- rowMeans(sampleTileMatrix[, which(group == 0), drop = FALSE] == 0)
 
   diff0s <- abs(zero_A - zero_B)
 
-  Log2Intensity <- SampleTileObj@metadata$Log2Intensity
-  log2FC_filter <- ifelse(Log2Intensity, signalThreshold, 2^signalThreshold)
-
+  log2FC_filter <- signalThreshold
   idx <- which(medians_a > log2FC_filter | medians_b > log2FC_filter | diff0s >= minZeroDiff)
 
   ############################################################################
   # Estimate differential accessibility
 
-  if (!Log2Intensity) {
-    sampleTileMatrix <- log2(sampleTileMatrix + 1)
-  }
-
-  res_pvals <- parallel::mclapply(rownames(sampleTileMatrix),
+  res_pvals <- parallel::mclapply(
+    rownames(sampleTileMatrix),
     function(x) {
       if (which(rownames(sampleTileMatrix) == x) %in% idx) {
         cbind(Tile = x, estimate_differential_accessibility(sampleTileMatrix[x, ], group, F))
@@ -155,25 +154,29 @@ getDifferentialAccessibleTiles <- function(SampleTileObj,
 
   filtered_res <- res_pvals[idx, ]
 
+  if (!all(is.na(filtered_res$P_value[filtered_res$P_value <= 0.95]))) {
+    pi0_reduced <- qvalue::pi0est(filtered_res$P_value[filtered_res$P_value <= 0.95],
+      pi0.method = "bootstrap",
+      lambda = seq(0, 0.6, .05)
+    )
 
-  pi0_reduced <- qvalue::pi0est(filtered_res$P_value[filtered_res$P_value <= 0.95],
-    pi0.method = "bootstrap",
-    lambda = seq(0, 0.6, .05)
-  )
-
-  filtered_res$FDR <- qvalue::qvalue(filtered_res$P_value, pi0 = pi0_reduced$pi0)$qvalues
-
+    filtered_res$FDR <- qvalue::qvalue(filtered_res$P_value, pi0 = pi0_reduced$pi0)$qvalues
+  } else {
+    filtered_res$FDR <- NA # TODO Handle appropriately
+  }
   #############################################################################
 
   # Join with original results
   full_results <- dplyr::left_join(res_pvals, filtered_res[, c("Tile", "FDR")], by = "Tile")
+
+  # Set results to NA where FDR is NA
   na.idx <- which(is.na(full_results$FDR))
   full_results$P_value[na.idx] <- NA
   full_results$TestStatistic[na.idx] <- NA
 
   sampleTileMatrix[is.na(sampleTileMatrix)] <- 0
-  meansA <- rowMeans(sampleTileMatrix[, group == 1], na.rm = T)
-  meansB <- rowMeans(sampleTileMatrix[, group == 0])
+  meansA <- rowMeans(sampleTileMatrix[, group == 1, drop = FALSE], na.rm = T)
+  meansB <- rowMeans(sampleTileMatrix[, group == 0, drop = FALSE])
   full_results$MeanDiff <- meansA - meansB
   full_results$MeanDiff[is.na(full_results$FDR)] <- NA
   full_results$CellPopulation <- rep(cellPopulation, length(meansA))

@@ -7,7 +7,8 @@
 \alias{callOpenTiles,list-method}
 \alias{.callOpenTiles_ArchR}
 \alias{callOpenTiles,ArchRProject-method}
-\title{\code{callOpenTiles} Perform peak-calling on a set of fragments or an ArchR Project.}
+\title{\code{callOpenTiles} Perform peak-calling on a set of fragments or an
+  ArchR Project.}
 \usage{
 callOpenTiles(
   ATACFragments,
@@ -17,10 +18,10 @@ callOpenTiles(
   cellPopLabel,
   cellPopulations = "ALL",
   studySignal = NULL,
+  cellCol = "RG",
   TxDb,
-  Org,
+  OrgDb,
   outDir,
-  fast = FALSE,
   numCores = 30,
   verbose = FALSE,
   force = FALSE
@@ -34,8 +35,9 @@ callOpenTiles(
   cellPopLabel,
   cellPopulations = "ALL",
   studySignal = NULL,
+  cellCol = "RG",
   TxDb,
-  Org,
+  OrgDb,
   outDir,
   numCores = 30,
   verbose = FALSE,
@@ -50,8 +52,9 @@ callOpenTiles(
   cellPopLabel,
   cellPopulations = "ALL",
   studySignal = NULL,
+  cellCol = "RG",
   TxDb,
-  Org,
+  OrgDb,
   outDir,
   numCores = 30,
   verbose = FALSE,
@@ -64,22 +67,30 @@ callOpenTiles(
   cellPopulations = "ALL",
   studySignal = NULL,
   TxDb,
-  Org,
+  OrgDb,
   outDir = NULL,
-  fast = FALSE,
   numCores = 30,
   verbose = FALSE,
   force = FALSE
 )
 }
 \arguments{
-\item{ATACFragments}{an ArchR Project, or a GRangesList of fragments}
+\item{ATACFragments}{an ArchR Project, or a GRangesList of fragments. Each
+GRanges in the GRanges list must have unique cell IDs in the column given
+by 'cellCol'.}
 
-\item{cellColData}{A DataFrame containing cell-level metadata and a 'Sample' column}
+\item{cellColData}{A DataFrame containing cell-level metadata. This must
+contain both a column 'Sample' with unique sample IDs and the column
+specified by 'cellPopLabel'.}
 
 \item{blackList}{A GRanges of blacklisted regions}
 
-\item{genome}{A valid BSGenome object describing the genome of your organism}
+\item{genome}{A BSgenome object, or the full name of an installed
+BSgenome data package, or a short string specifying the name of an NCBI
+assembly (e.g. "GRCh38", "TAIR10.1", etc...) or UCSC genome (e.g. "hg38",
+"bosTau9", "galGal6", "ce11", etc...). The supplied short string must refer
+unambiguously to an installed BSgenome data package. See
+\link[BSgenome]{getBSgenome}.}
 
 \item{cellPopLabel}{string indicating which column in the ArchRProject
 metadata contains the cell population label.}
@@ -90,21 +101,29 @@ the ArchRProject metadata.  Optional, if cellPopulations='ALL', then peak
 calling is done on all cell populations in the ArchR project metadata.
 Default is 'ALL'.}
 
-\item{studySignal}{The median signal (number of fragments) in your study. If not
-set, this will be calculated using the input ArchR project but relies on
-the assumption that the ArchR project encompasses your whole study (i.e. is
-not a subset).}
+\item{studySignal}{The median signal (number of fragments) in your study. If
+not set, this will be calculated using the input ArchR project but relies
+on the assumption that the ArchR project encompasses your whole study (i.e.
+is not a subset).}
 
-\item{TxDb}{is an AnnotationDbi object with transcript info for the organism.}
+\item{cellCol}{The column in cellColData specifying unique cell ids or
+barcodes. Default is "RG", the unique cell identifier used by ArchR.}
 
-\item{Org}{is the genome-wide annotation package for your organism.}
+\item{TxDb}{The exact package name of a TxDb-class transcript annotation
+package for your organism (e.g. "TxDb.Hsapiens.UCSC.hg38.refGene"). This
+must be installed. See
+\href{https://bioconductor.org/packages/release/data/annotation/}{
+Bioconductor AnnotationData Packages}.}
 
-\item{outDir}{is a string describing the output directory for coverage files
-and TxDb/Org. Must be a complete directory string. With ArchR input,
-set outDir to NULL to create a directory within the input ArchR project 
-directory named MOCHA for saving files.}
+\item{OrgDb}{The exact package name of a OrgDb-class genome wide annotation
+package for your organism (e.g. "org.Hs.eg.db"). This must be installed.
+See \href{https://bioconductor.org/packages/release/data/annotation/}{
+Bioconductor AnnotationData Packages}}
 
-\item{fast}{Optional, set to TRUE to use a faster but more memory-intensive}
+\item{outDir}{is a string describing the output directory for coverage files.
+Must be a complete directory string. With ArchR input, set outDir to NULL
+to create a directory within the input ArchR project directory named MOCHA
+for saving files.}
 
 \item{numCores}{integer. Number of cores to parallelize peak-calling across
 multiple cell populations.}
@@ -126,36 +145,34 @@ tileResults A MultiAssayExperiment object containing ranged data for
 \examples{
 \dontrun{
 # Starting from an ArchR Project:
-library(TxDb.Hsapiens.UCSC.hg38.refGene)
-library(org.Hs.eg.db)
 tileResults <- MOCHA::callOpenTiles(
   ArchRProj = myArchRProj,
   cellPopLabel = "celltype_labeling",
   cellPopulations = "CD4",
-  TxDb = TxDb.Hsapiens.UCSC.hg38.refGene,
-  Org = org.Hs.eg.db,
+  TxDb = "TxDb.Hsapiens.UCSC.hg38.refGene",
+  OrgDb = "org.Hs.eg.db",
   numCores = 1
 )
 }
 \donttest{
 # Starting from GRangesList
 if (
-  require(BSgenome.Hsapiens.UCSC.hg19) && 
-  require(TxDb.Hsapiens.UCSC.hg38.refGene) && 
-  require(org.Hs.eg.db)
+  requireNamespace("BSgenome.Hsapiens.UCSC.hg19") &&
+    requireNamespace("TxDb.Hsapiens.UCSC.hg38.refGene") &&
+    requireNamespace("org.Hs.eg.db")
 ) {
-tiles <- MOCHA::callOpenTiles(
-  ATACFragments = MOCHA::exampleFragments,
-  cellColData = MOCHA::exampleCellColData,
-  blackList = MOCHA::exampleBlackList,
-  genome = BSgenome.Hsapiens.UCSC.hg19,
-  TxDb = TxDb.Hsapiens.UCSC.hg38.refGene,
-  Org = org.Hs.eg.db,
-  outDir = tempdir(),
-  cellPopLabel = "Clusters",
-  cellPopulations = c("C2", "C5"),
-  numCores = 1
-)
+  tiles <- MOCHA::callOpenTiles(
+    ATACFragments = MOCHA::exampleFragments,
+    cellColData = MOCHA::exampleCellColData,
+    blackList = MOCHA::exampleBlackList,
+    genome = "BSgenome.Hsapiens.UCSC.hg19",
+    TxDb = "TxDb.Hsapiens.UCSC.hg38.refGene",
+    OrgDb = "org.Hs.eg.db",
+    outDir = tempdir(),
+    cellPopLabel = "Clusters",
+    cellPopulations = c("C2", "C5"),
+    numCores = 1
+  )
 }
 }
 

@@ -9,7 +9,6 @@ getSampleTileMatrix(
   cellPopulations = "ALL",
   groupColumn = NULL,
   threshold = 0.2,
-  log2Intensity = TRUE,
   numCores = 1,
   verbose = FALSE
 )
@@ -34,9 +33,6 @@ in to be retained. If set to 0, retain the union of all samples' peaks
 (this is equivalent to a threshold of 1/numSamples). It is recommended to
 tune this parameter to omit potentially spurious peaks.}
 
-\item{log2Intensity}{Boolean, set to TRUE to return the log2 of the
-sample-tile intensity matrix. Optional, default is FALSE.}
-
 \item{numCores}{Optional, the number of cores to use with multiprocessing.
 Default is 1.}
 
@@ -55,28 +51,28 @@ SampleTileMatrices a MultiAssayExperiment containing a sample-tile
 \donttest{
 # Starting from GRangesList
 if (
-  require(BSgenome.Hsapiens.UCSC.hg19) && 
-  require(TxDb.Hsapiens.UCSC.hg38.refGene) && 
-  require(org.Hs.eg.db)
+  require(BSgenome.Hsapiens.UCSC.hg19) &&
+    require(TxDb.Hsapiens.UCSC.hg38.refGene) &&
+    require(org.Hs.eg.db)
 ) {
-tiles <- MOCHA::callOpenTiles(
-  ATACFragments = MOCHA::exampleFragments,
-  cellColData = MOCHA::exampleCellColData,
-  blackList = MOCHA::exampleBlackList,
-  genome = BSgenome.Hsapiens.UCSC.hg19,
-  TxDb = TxDb.Hsapiens.UCSC.hg38.refGene,
-  Org = org.Hs.eg.db,
-  outDir = tempdir(),
-  cellPopLabel = "Clusters",
-  cellPopulations = c("C2", "C5"),
-  numCores = 1
-)
+  tiles <- MOCHA::callOpenTiles(
+    ATACFragments = MOCHA::exampleFragments,
+    cellColData = MOCHA::exampleCellColData,
+    blackList = MOCHA::exampleBlackList,
+    genome = "BSgenome.Hsapiens.UCSC.hg19",
+    TxDb = "TxDb.Hsapiens.UCSC.hg38.refGene",
+    Org = "org.Hs.eg.db",
+    outDir = tempdir(),
+    cellPopLabel = "Clusters",
+    cellPopulations = c("C2", "C5"),
+    numCores = 1
+  )
 
-SampleTileMatrices <- MOCHA::getSampleTileMatrix(
-  tiles,
-  cellPopulations = c('C2', 'C5'),
-  threshold = 0 # Take union of all samples' open tiles
-)
+  SampleTileMatrices <- MOCHA::getSampleTileMatrix(
+    tiles,
+    cellPopulations = c("C2", "C5"),
+    threshold = 0 # Take union of all samples' open tiles
+  )
 }
 }
 

@@ -8,58 +8,76 @@ knitr::opts_chunk$set(
 ## ----setup--------------------------------------------------------------------
 #  library(MOCHA)
 #  library(ArchR)
+#  library(TxDb.Hsapiens.UCSC.hg38.refGene)
+#  library(org.Hs.eg.db)
+#  library(BSgenome.Hsapiens.UCSC.hg19)
 
 ## -----------------------------------------------------------------------------
 #  # You should substitute this with your own ArchR project.
 #  # You must have completed cell labeling with your ArchR project.
 #  
-#  myArchRProj <- ArchR::loadArchRProject("/home/jupyter/FullCovid")
+#  ArchRProj <- ArchR::loadArchRProject("/home/jupyter/FullCovid")
 #  
-#  # Define your annotation package for TxDb object(s)
-#  # and genome-wide annotation.
-#  # Here our samples are human using hg38 as a reference.
-#  # For more info: <https://bioconductor.org/packages/3.15/data/annotation/>
+#  metadata <- data.table::as.data.table(ArchR::getCellColData(ArchRProj))
+#  studySignal <- median(metadata$nFrags)
 #  
-#  library(TxDb.Hsapiens.UCSC.hg38.refGene)
-#  library(org.Hs.eg.db)
-#  TxDb <- TxDb.Hsapiens.UCSC.hg38.refGene
-#  Org <- org.Hs.eg.db
+#  # Get metadata information at the sample level
+#  lookup_table <- unique(
+#    metadata[, c(
+#      "Sample",
+#      "COVID_status",
+#      "Visit",
+#      "days_since_symptoms"
+#    ),
+#    with = FALSE
+#    ]
+#  )
 #  
-#  # Optional: Filter your ArchR project by sample.
-#  # For our example we filter ArchR Project to three samples from
-#  # each COVID Status (3 Positive, 3 Negative).
+#  # Subset to visit 1 and extract samples
+#  samplesToKeep <- lookup_table$Sample[
+#    lookup_table$Visit == "FH3 COVID-19 Visit 1" &
+#      lookup_table$days_since_symptoms <= 15 |
+#      is.na(lookup_table$days_since_symptoms)
+#  ]
 #  
-#  samplesToKeep <- c( "B011-AP0C1W3", "B011-AP0C1W8", "B011-AP0C2W1", "B025_FSQAAZ0BZZS-01", "B025_FSQAAZ0C0YJ-01", "B025_FSQAAZ0C00P-07" )
-#  idxSample <- BiocGenerics::which(myArchRProj$Sample %in% samplesToKeep)
-#  cellsSample <- myArchRProj$cellNames[idxSample]
-#  myArchRProj <- myArchRProj[cellsSample, ]
+#  # subset ArchR Project
+#  idxSample <- BiocGenerics::which(ArchRProj$Sample %in% samplesToKeep)
+#  cellsSample <- ArchRProj$cellNames[idxSample]
+#  ArchRProj <- ArchRProj[cellsSample, ]
+#  
 
 ## -----------------------------------------------------------------------------
 #  # Parameters for calling open tiles.
 #  cellPopLabel <- "CellSubsets"
-#  cellPopulations <- c("MAIT", "CD16 Mono", "DC")
+#  cellPopulations <- c("CD16 Mono")
 #  numCores <- 20
 
 ## -----------------------------------------------------------------------------
 #  tileResults <- MOCHA::callOpenTiles(
-#    myArchRProj,
+#    ArchRProj,
 #    cellPopLabel = cellPopLabel,
 #    cellPopulations = cellPopulations,
-#    TxDb = TxDb,
-#    Org = Org,
-#    numCores = numCores
+#    TxDb = "TxDb.Hsapiens.UCSC.hg38.refGene",
+#    Org = "org.Hs.eg.db",
+#    numCores = numCores,
+#    studySignal = studySignal,
+#    outDir = tempdir()
 #  )
 
 ## -----------------------------------------------------------------------------
-#  # We have 6 samples total: 3 samples for each COVID status (3 positive and 3 negative).
+#  # Computing the TSAM can take into account groupings of
+#  # samples when determining consensus tiles.
+#  # Our samples can be grouped by the metadata column 'COVID_status'
+#  # into 'Positive' and 'Negative' groups.
 #  # Since these groupings may have unique biology and we expect differences
 #  # in accessibility, we want to compute consensus tiles on each
 #  # group independently and take the union of consensus tiles from each group.
 #  groupColumn <- "COVID_status"
 #  
-#  # We set the threshold to require a tile must be open in at least 2 samples
-#  # in its group to be retained (2/3=0.66)
-#  threshold <- 0.66
+#  # We set the threshold to require a tile must be open in at least
+#  # (0.2 * the number of samples in each group) samples to be
+#  # retained
+#  threshold <- 0.2
 #  
 #  # Alternatively, you can set the threshold to 0 to keep the union of
 #  # all samples' open tiles.
@@ -68,11 +86,12 @@ knitr::opts_chunk$set(
 #  
 #  SampleTileMatrices <- MOCHA::getSampleTileMatrix(
 #    tileResults,
-#    cellPopulations = cellPopulations[1],
+#    cellPopulations = "CD16 Mono",
 #    groupColumn = groupColumn,
 #    threshold = threshold,
-#    log2Intensity = TRUE
+#    verbose = FALSE
 #  )
+#  
 
 ## -----------------------------------------------------------------------------
 #  # This function can also take any GRanges object
@@ -89,10 +108,12 @@ knitr::opts_chunk$set(
 #  )
 
 ## -----------------------------------------------------------------------------
+#  regionToPlot = "chr4:XXX-XXXX"
+#  
 #  countSE <- MOCHA::extractRegion(
 #    SampleTileObj = SampleTileMatrices,
 #    cellPopulations = "CD16 Mono",
-#    region = "chr3:38137866-38139912",
+#    region = regionToPlot,
 #    groupColumn = "COVID_status",
 #    numCores = numCores,
 #    sampleSpecific = FALSE
@@ -103,19 +124,23 @@ knitr::opts_chunk$set(
 #  # you must have the package RMariaDB installed
 #  MOCHA::plotRegion(countSE = countSE, whichGene = "MYD88")
 #  dev.off()
+#  
 
 ## -----------------------------------------------------------------------------
-#  cellPopulation <- "MAIT"
+#  cellPopulation <- "CD16 Mono"
+#  groupColumn <- "COVID_status"
 #  foreground <- "Positive"
 #  background <- "Negative"
-#  
-#  # Standard output will display the number of tiles found below a false-discovery rate threshold.
-#  # This parameter does not filter results and only affects the afforementioned message.
-#  fdrToDisplay <- 0.2
 #  
 #  # Choose to output a GRanges or data.frame.
 #  # Default is TRUE
 #  outputGRanges <- TRUE
+#  
+#  # Optional: Standard output will display the number of tiles found
+#  # below a false-discovery rate threshold.
+#  # This parameter does not filter results and only affects the
+#  # afforementioned message.
+#  fdrToDisplay <- 0.2
 #  
 #  differentials <- MOCHA::getDifferentialAccessibleTiles(
 #    SampleTileObj = SampleTileMatrices,
@@ -127,17 +152,24 @@ knitr::opts_chunk$set(
 #    outputGRanges = outputGRanges,
 #    numCores = numCores
 #  )
+#  
+#  # The output contains a GRanges with all tiles and their differential
+#  # test results. We can filter by FDR to get our set of
+#  # differentially accessible tiles:
+#  
+#  res = head(plyranges::filter(differentials, seqnames =='chr4' & FDR < 0.2))
+#  
 
 ## -----------------------------------------------------------------------------
-#  regions <- head(differentials, 10)
+#  regions = res$Tile
 #  
 #  # Alternatively, define regions as a character vector
 #  # of region strings in the format "chr:start-end"
 #  # regions <- c(
-#  # "chrY:7326500-7326999",
-#  # "chrY:7327000-7327499",
-#  # "chrY:7339500-7339999",
-#  # "chrY:7344500-7344999"
+#  # "chr4:7326500-7326999",
+#  # "chr4:7327000-7327499",
+#  # "chr4:7339500-7339999",
+#  # "chr4:7344500-7344999"
 #  # )
 #  
 #  links <- MOCHA::getCoAccessibleLinks(
@@ -153,5 +185,5 @@ knitr::opts_chunk$set(
 #  # correlation - this output also adds the chromosome,
 #  # start, and end site of each link to the table.
 #  
-#  MOCHA::filterCoAccessibleLinks(links, threshold = 0.7)
+#  MOCHA::filterCoAccessibleLinks(links, threshold = 0.4)
 
