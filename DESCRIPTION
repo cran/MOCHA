@@ -1,7 +1,7 @@
 Package: MOCHA
 Type: Package
 Title: Modeling for Single-Cell Open Chromatin Analysis
-Version: 1.0.2
+Version: 1.1.0
 Authors@R: 
     c(person(given = "Samir",
            family = "Rachid Zaim",
@@ -49,23 +49,25 @@ Imports: data.table, plyranges (>= 1.14.0), dplyr, GenomicRanges,
         RaggedExperiment, MultiAssayExperiment, SummarizedExperiment,
         stringr, ggbio, wCorr, magrittr, rlang, AnnotationDbi,
         BiocGenerics, GenomeInfoDb, GenomicFeatures, IRanges,
-        OrganismDbi, S4Vectors, assertthat, biovizBase, ensembldb,
-        ggplot2, ggrepel, matrixStats, methods, qvalue, scales, tidyr,
-        ggridges, pbapply, BSgenome, tidyselect, lifecycle
+        S4Vectors, assertthat, ensembldb, ggplot2, ggrepel,
+        matrixStats, methods, qvalue, scales, tidyr, ggridges, pbapply,
+        BSgenome, tidyselect, lifecycle
 Suggests: ArchR, RMariaDB, motifmatchr, BiocManager,
-        TxDb.Hsapiens.UCSC.hg38.refGene, org.Hs.eg.db,
+        TxDb.Hsapiens.UCSC.hg38.refGene,
+        TxDb.Hsapiens.UCSC.hg19.knownGene, org.Hs.eg.db,
         BSgenome.Hsapiens.UCSC.hg19, withr, knitr, rmarkdown, chromVAR,
-        testthat (>= 3.0.0), uwot, irlba, glmmTMB, Matrix, purrr,
-        lmerTest
+        testthat (>= 3.0.0), uwot, irlba, glmmTMB, Matrix, waldo,
+        purrr, lmerTest, Biobase, lme4, zip, rtracklayer, cowplot,
+        mixtools, zoo
 Additional_repositories: https://imran-aifi.github.io/drat
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2023-12-21 00:46:31 UTC; imran.mcgrath
+Packaged: 2024-01-25 08:05:32 UTC; imran.mcgrath
 Author: Samir Rachid Zaim [aut, ctb],
   Mark-Phillip Pebworth [aut, ctb],
   Imran McGrath [aut, cre],
   Lauren Okada [aut, ctb],
   Xiaojun Li [aut, ctb]
 Repository: CRAN
-Date/Publication: 2023-12-21 11:40:23 UTC
+Date/Publication: 2024-01-25 12:20:12 UTC

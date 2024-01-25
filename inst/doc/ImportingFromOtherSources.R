@@ -1,4 +1,4 @@
-## ---- include = FALSE---------------------------------------------------------
+## ----include = FALSE----------------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -295,7 +295,7 @@ knitr::opts_chunk$set(
 #  );
 #  sampling_prob <- 1 / (approx(x = row.covs.dens$x, y = row.covs.dens$y, xout = x.sp@metaData[,"logUMI"])$y + .Machine$double.eps);
 #  set.seed(1);
-#  idx.landmark.ds <- sort(sample(x = seq(nrow(x.sp)), size = 10000, prob = sampling_prob));
+#  idx.landmark.ds <- base::sort(sample(x = seq(nrow(x.sp)), size = 10000, prob = sampling_prob));
 #  x.landmark.sp = x.sp[idx.landmark.ds,];
 #  x.query.sp = x.sp[-idx.landmark.ds,];
 #  x.landmark.sp = runDiffusionMaps(

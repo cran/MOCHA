@@ -119,13 +119,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; }
   for (var i = 0; i < sheets.length; i++) {
     if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
     try { var rules = sheets[i].cssRules; } catch (e) { continue; }
-    for (var j = 0; j < rules.length; j++) {
+    var j = 0;
+    while (j < rules.length) {
       var rule = rules[j];
       // check if there is a div.sourceCode rule
-      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
       var style = rule.style.cssText;
       // check if color or background-color is set
-      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
       // replace div.sourceCode by a pre.sourceCode rule
       sheets[i].deleteRule(j);
       sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
@@ -658,7 +665,7 @@ working directory, and load it:</p>
 <span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>);</span>
 <span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>sampling_prob <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="sc">/</span> (<span class="fu">approx</span>(<span class="at">x =</span> row.covs.dens<span class="sc">$</span>x, <span class="at">y =</span> row.covs.dens<span class="sc">$</span>y, <span class="at">xout =</span> x.sp<span class="sc">@</span>metaData[,<span class="st">&quot;logUMI&quot;</span>])<span class="sc">$</span>y <span class="sc">+</span> .Machine<span class="sc">$</span>double.eps);</span>
 <span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>);</span>
-<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>idx.landmark.ds <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">sample</span>(<span class="at">x =</span> <span class="fu">seq</span>(<span class="fu">nrow</span>(x.sp)), <span class="at">size =</span> <span class="dv">10000</span>, <span class="at">prob =</span> sampling_prob));</span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>idx.landmark.ds <span class="ot">&lt;-</span> base<span class="sc">::</span><span class="fu">sort</span>(<span class="fu">sample</span>(<span class="at">x =</span> <span class="fu">seq</span>(<span class="fu">nrow</span>(x.sp)), <span class="at">size =</span> <span class="dv">10000</span>, <span class="at">prob =</span> sampling_prob));</span>
 <span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a>x.landmark.sp <span class="ot">=</span> x.sp[idx.landmark.ds,];</span>
 <span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a>x.query.sp <span class="ot">=</span> x.sp[<span class="sc">-</span>idx.landmark.ds,];</span>
 <span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a>x.landmark.sp <span class="ot">=</span> <span class="fu">runDiffusionMaps</span>(</span>
